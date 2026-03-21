@@ -1,13 +1,16 @@
+<c-vars variable class />
+
 <div
     class="z-50 fixed inset-0 flex justify-center items-center bg-black/50"
+    @click.stop="{{ variable }} = false"
     x-show="{{ variable }}"
     x-transition.opacity.duration.500ms
     x-cloak
-    {{ attrs }}
 >
     <div
-        class="{{ class }} bg-white max-sm:mx-6 rounded-sm w-full max-w-md overflow-hidden"
-        @mousedown.outside="{{ variable }} = false"
+        class="{{ class }} bg-[#212121] max-sm:mx-8 border border-[#323232] rounded-lg w-full max-w-lg"
+        @click.stop
+        {{ attrs }}
     >
         {{ slot }}
     </div>

@@ -1,30 +1,40 @@
-{% if messages %}
-    {% for message in messages %}
+<div
+    x-data="{
+        show: false,
+        message: '{% for message in messages %}{% if forloop.first %}{{ message }}{% endif %}{% endfor %}',
+        messageType: '{% for message in messages %}{% if forloop.first %}{{ message.tags }}{% endif %}{% endfor %}',
+    }"
+    x-init="
+        if (message) {
+            setTimeout(() => show = true, 0)
+            setTimeout(() => show = false, 5000)
+        }
+    "
+    @show-message.window="
+        message = $event.detail.message
+        messageType = $event.detail.messageType
+        if (message) {
+            setTimeout(() => show = true, 0)
+            setTimeout(() => show = false, 5000)
+        }
+    "
+    :class="{ 'translate-y-32': show }"
+    class="-top-28 left-1/2 z-50 fixed max-sm:px-4 w-full max-w-md -translate-x-1/2 duration-500 cursor-pointer"
+    @click="show = false"
+>
+    <div class="flex bg-[#212121] border border-[#323232] rounded-sm overflow-hidden">
         <div
-            x-data="{ show: false, message: '{{ message }}', message_type: '{{ message.tags }}' }"
-            x-init="
-                setTimeout(() => show = true, 0);
-                setTimeout(() => show = false, 5000);
-            "
-            :class="{ 'translate-y-32': show }"
-            class="-top-26 left-1/2 z-50 fixed px-4 sm:px-0 w-full max-w-md -translate-x-1/2 duration-500 cursor-pointer"
-            @click="show = false"
+            :class="messageType == 'success' ? 'bg-emerald-600' : 'bg-red-600'"
+            class="flex justify-center items-center px-4 py-2"
         >
-            <div class="flex bg-white rounded-sm overflow-hidden">
-                <div
-                    :class="message_type == 'success' ? 'bg-emerald-600' : 'bg-red-600'"
-                    class="flex justify-center items-center px-4 py-2"
-                >
-                    <svg class="fill-current size-5 text-white" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                        <path x-show="message_type == 'success'" x-cloak d="M20 3.33331C10.8 3.33331 3.33337 10.8 3.33337 20C3.33337 29.2 10.8 36.6666 20 36.6666C29.2 36.6666 36.6667 29.2 36.6667 20C36.6667 10.8 29.2 3.33331 20 3.33331ZM16.6667 28.3333L8.33337 20L10.6834 17.65L16.6667 23.6166L29.3167 10.9666L31.6667 13.3333L16.6667 28.3333Z" />
-                        <path x-show="message_type == 'error'" x-cloak d="M20 3.33331C10.8 3.33331 3.33337 10.8 3.33337 20C3.33337 29.2 10.8 36.6666 20 36.6666C29.2 36.6666 36.6667 29.2 36.6667 20C36.6667 10.8 29.2 3.33331 20 3.33331ZM21.6667 28.3333H18.3334V25H21.6667V28.3333ZM21.6667 21.6666H18.3334V11.6666H21.6667V21.6666Z"></path>
-                    </svg>
-                </div>
-                <div class="px-4 py-2">
-                    <p class="font-medium text-sm" x-text="message_type == 'success' ? 'Sucesso' : 'Aviso'"></p>
-                    <p class="text-gray-600 text-xs" x-text="message"></p>
-                </div>
-            </div>
+            <svg class="fill-current size-5 text-white" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                <path x-show="messageType == 'success'" x-cloak d="M20 3.33331C10.8 3.33331 3.33337 10.8 3.33337 20C3.33337 29.2 10.8 36.6666 20 36.6666C29.2 36.6666 36.6667 29.2 36.6667 20C36.6667 10.8 29.2 3.33331 20 3.33331ZM16.6667 28.3333L8.33337 20L10.6834 17.65L16.6667 23.6166L29.3167 10.9666L31.6667 13.3333L16.6667 28.3333Z" />
+                <path x-show="messageType == 'error'" x-cloak d="M20 3.33331C10.8 3.33331 3.33337 10.8 3.33337 20C3.33337 29.2 10.8 36.6666 20 36.6666C29.2 36.6666 36.6667 29.2 36.6667 20C36.6667 10.8 29.2 3.33331 20 3.33331ZM21.6667 28.3333H18.3334V25H21.6667V28.3333ZM21.6667 21.6666H18.3334V11.6666H21.6667V21.6666Z"></path>
+            </svg>
         </div>
-    {% endfor %}
-{% endif %}
+        <div class="px-4 py-2">
+            <p class="font-semibold text-white text-sm" x-text="messageType == 'success' ? 'Sucesso' : 'Aviso'"></p>
+            <p class="text-gray-300 text-xs" x-text="message"></p>
+        </div>
+    </div>
+</div>

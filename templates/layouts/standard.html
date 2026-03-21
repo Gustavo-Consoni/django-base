@@ -9,8 +9,8 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <meta name="description" content="Plataforma de treino para resultados consistentes">
+        <link rel="icon" href="{% static 'images/logo/colada-sem-fundo-192x192.png' %}" type="image/png">
         <link rel="stylesheet" href="{% static 'css/fonts.css' %}">
-        <link rel="icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon">
         {% tailwind_css %}
         <!-- OG -->
         <meta property="og:type" content="website">
@@ -32,7 +32,7 @@
         <link rel="apple-touch-icon" href="{% static 'images/logo/descolada-com-fundo-192x192.png' %}" sizes="192x192">
         <link rel="apple-touch-icon" href="{% static 'images/logo/descolada-sem-fundo-512x512.png' %}" sizes="512x512">
         {% block "head" %}{% endblock %}
-        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15/dist/cdn.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.8/dist/cdn.min.js"></script>
         <script>
             if ("serviceWorker" in navigator) {
                 window.addEventListener("load", () => {

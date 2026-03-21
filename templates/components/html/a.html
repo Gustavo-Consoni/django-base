@@ -1,7 +1,20 @@
+<c-vars class variant />
+
 <a
     class="
         {{ class }}
-        flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-500 px-4 py-2 rounded-sm font-semibold text-white text-sm duration-300
+        {% if variant == 'link' %}
+            text-blue-400 hover:text-blue-300 font-medium
+        {% elif variant == 'confirm' %}
+            flex justify-center items-center gap-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-sm font-semibold text-white
+        {% elif variant == 'cancel' %}
+            flex justify-center items-center gap-2 bg-red-600 hover:bg-red-400 px-4 py-2 rounded-sm font-semibold text-white
+        {% else %}
+            flex justify-center items-center gap-2 bg-[#101010] hover:bg-[#212121] px-4 py-2 border border-[#323232] rounded-sm font-semibold text-white
+        {% endif %}
+        text-sm duration-300 cursor-pointer
     "
     {{ attrs }}
->{{ slot }}</a>
+>
+    {{ slot }}
+</a>

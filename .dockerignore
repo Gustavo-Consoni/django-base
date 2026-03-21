@@ -2,6 +2,10 @@
 .env
 venv/
 media/
+.claude/
+CLAUDE.md
 db.sqlite3
 __pycache__/
 .django_tailwind_cli/
+requirements-dev.txt
+service_account.json

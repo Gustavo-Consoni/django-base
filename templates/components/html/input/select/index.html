@@ -1,0 +1,111 @@
+<c-vars class label description name errors variable required placeholder options search />
+
+<div
+    x-data="{
+        open: false,
+        selected: {
+            id: '',
+            name: '',
+        },
+        search: '',
+        normalize(string) {
+            return string ? string.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() : ''
+        },
+        get filteredOptions() {
+            if (!this.search) return {{ options }}
+            return {{ options }}.filter(option => this.normalize(option.name).includes(this.normalize(this.search)))
+        },
+    }"
+    x-effect="
+        const option = {{ options }}.find(option => option.id == selected.id)
+        if (option) selected.name = option.name
+    "
+    class="{{ class }} space-y-2"
+    x-modelable="selected.id"
+    x-model="{{ variable }}"
+>
+    {% if label %}
+        <p class="font-medium text-white text-sm">{{ label }}</p>
+    {% endif %}
+
+    {% if description %}
+        <p class="text-xs">{{ description }}</p>
+    {% endif %}
+
+    <div class="relative text-gray-300 text-sm">
+        <div
+            class="absolute inset-0 cursor-pointer"
+            @click="
+                open = !open
+                {% if search %}
+                    if (open) $nextTick(() => $refs.search.focus())
+                {% endif %}
+            "
+        ></div>
+        <div :class="{ 'border-blue-600': open }" class="flex items-center gap-2 p-2 border border-[#323232] rounded-sm duration-300">
+            <input
+                class="outline-none w-full"
+                x-model="selected.name"
+                type="text"
+                {% if placeholder %} placeholder="{{ placeholder }}" {% endif %}
+                {% if required %} required {% endif %}
+            >
+            <c-icon.solid.20.chevron_up_down class="shrink-0"></c-icon.solid.20.chevron_up_down>
+        </div>
+        <div
+            class="top-12 left-0 z-10 absolute bg-[#101010] border border-[#323232] rounded-sm w-full"
+            @click.outside="open = false"
+            x-show="open"
+            x-transition
+            x-cloak
+        >
+            {% if search %}
+                <div class="relative">  
+                    <c-icon.solid.20.magnifying-glass class="top-2 left-2 -z-10 absolute text-white cursor-text"></c-icon.solid.20.magnifying-glass>
+                    <input class="py-2 pr-8 pl-10 outline-none w-full" x-model="search" x-ref="search" type="text" />
+                    <div class="border-[#323232] border-b"></div>
+                </div>
+            {% endif %}
+            <div class="max-h-40 overflow-y-auto">
+                <template x-for="option in filteredOptions" :key="option.id">
+                    <div
+                        :class="{ 'bg-[#212121]': selected.id == option.id }"
+                        class="flex justify-between items-center gap-2 hover:bg-[#212121] p-2 duration-300 cursor-pointer"
+                        @click="
+                            if (selected.id == option.id) {
+                                selected = {
+                                    id: '',
+                                    name: '',
+                                }
+                            } else {
+                                selected = {
+                                    id: option.id,
+                                    name: option.name,
+                                }
+                            }
+                            open = false
+                        "
+                    >
+                        <p x-text="option.name"></p>
+                        {% if slot %}
+                            {{ slot }}
+                        {% else%}
+                            <c-icon.solid.20.check class="shrink-0" x-show="selected.id == option.id" x-cloak></c-icon.solid.20.check>
+                        {% endif %}
+                    </div>
+                </template>
+                {% if search %}
+                    <template x-if="filteredOptions.length == 0">
+                        <p class="flex justify-center items-center h-40 text-center">Nenhum resultado encontrado</p>
+                    </template>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {% if errors %}
+        <template x-for="error in {{ errors }}">
+            <p class="text-red-500 text-xs" x-text="error"></p>
+        </template>
+    {% endif %}
+</div>

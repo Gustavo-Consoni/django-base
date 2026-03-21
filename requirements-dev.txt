@@ -5,10 +5,8 @@ django-debug-toolbar
 django-unfold
 django-cotton
 
-
 pillow
 python-decouple
-
 
 gunicorn
 psycopg[binary]

@@ -8,7 +8,7 @@ urlpatterns = [
     path("unfold/", admin.site.urls),
     path("", include("apps.home.urls")),
     path("", include("apps.account.urls")),
-    path("", include("apps.payment.urls")),
+    path("", include("apps.billing.urls")),
 ]
 
 

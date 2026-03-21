@@ -5,34 +5,28 @@ from apps.account.models import User
 class Plan(models.Model):
 
     class Cycle(models.TextChoices):
-        WEEKLY       = "WEEKLY",       "Semanal"
-        BIWEEKLY     = "BIWEEKLY",     "Quinzenal"
         MONTHLY      = "MONTHLY",      "Mensal"
-        BIMONTHLY    = "BIMONTHLY",    "Bimestral"
         QUARTERLY    = "QUARTERLY",    "Trimestral"
         SEMIANNUALLY = "SEMIANNUALLY", "Semestral"
         YEARLY       = "YEARLY",       "Anual"
 
     class BillingType(models.TextChoices):
-        UNDEFINED   = "UNDEFINED",   "Indefinido"
-        BOLETO      = "BOLETO",      "Boleto"
         CREDIT_CARD = "CREDIT_CARD", "Cartão de Crédito"
         PIX         = "PIX",         "Pix"
 
     name          = models.CharField(max_length=50, verbose_name="Nome")
     value         = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Valor")
-    cycle         = models.CharField(max_length=15, choices=Cycle.choices, default=Cycle.MONTHLY, verbose_name="Ciclo")
-    billing_type  = models.CharField(max_length=15, choices=BillingType.choices, default=BillingType.CREDIT_CARD, verbose_name="Tipo de Cobrança")
+    cycle         = models.CharField(max_length=15, choices=Cycle.choices, verbose_name="Ciclo")
+    billing_type  = models.CharField(max_length=15, choices=BillingType.choices, verbose_name="Tipo de Cobrança")
     active        = models.BooleanField(default=False, verbose_name="Ativo")
-    free_period   = models.PositiveSmallIntegerField(default=0, verbose_name="Período Gratuito")
-    refund_period = models.PositiveSmallIntegerField(default=7, verbose_name="Período de Reembolso")
+    free_period   = models.PositiveIntegerField(default=0, verbose_name="Período Gratuito")
+    refund_period = models.PositiveIntegerField(default=7, verbose_name="Período de Reembolso")
     created_at    = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
 
     def __str__(self):
         return self.name
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "plano"
         verbose_name_plural = "planos"
 
@@ -46,8 +40,8 @@ class Coupon(models.Model):
     code              = models.CharField(max_length=20, unique=True, verbose_name="Código do Cupom")
     discount          = models.DecimalField(max_digits=6, decimal_places=2, verbose_name="Desconto")
     discount_type     = models.CharField(max_length=15, choices=DiscountType.choices, verbose_name="Tipo de desconto")
-    maximum_uses      = models.PositiveSmallIntegerField(null=True, blank=True, verbose_name="Máximo de Usos")
-    total_uses        = models.PositiveSmallIntegerField(default=0, verbose_name="Total de Usos")
+    maximum_uses      = models.PositiveIntegerField(null=True, blank=True, verbose_name="Máximo de Usos")
+    total_uses        = models.PositiveIntegerField(default=0, verbose_name="Total de Usos")
     active            = models.BooleanField(default=False, verbose_name="Ativo")
     activation_date   = models.DateField(null=True, blank=True, verbose_name="Data de ativação")
     deactivation_date = models.DateField(null=True, blank=True, verbose_name="Data de desativação")
@@ -57,7 +51,6 @@ class Coupon(models.Model):
         return self.code
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "cupom"
         verbose_name_plural = "cupons"
 
@@ -71,7 +64,6 @@ class Customer(models.Model):
         return self.customer_id
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "cliente"
         verbose_name_plural = "clientes"
 
@@ -88,14 +80,13 @@ class Subscription(models.Model):
     plan            = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="subscriptions", verbose_name="Plano")
     coupon          = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL, related_name="subscriptions", verbose_name="Cupom")
     status          = models.CharField(max_length=15, choices=Status.choices, default=Status.INACTIVE, verbose_name="Status da Assinatura")
-    next_due        = models.DateField(verbose_name="Próximo Vencimento")
+    next_due        = models.DateField(null=True, blank=True, verbose_name="Próximo Vencimento")
     created_at      = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
 
     def __str__(self):
         return self.subscription_id
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "assinatura"
         verbose_name_plural = "assinaturas"
 
@@ -115,7 +106,6 @@ class SubscriptionStatusHistory(models.Model):
         return f"{self.subscription} - {self.status}"
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "histórico de assinatura"
         verbose_name_plural = "histórico de assinaturas"
 
@@ -133,10 +123,9 @@ class SubscriptionPlanHistory(models.Model):
     created_at   = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
 
     def __str__(self):
-        return f"{self.subscription}: {self.old_plan} - {self.new_plan}"
+        return f"{self.subscription} - {self.old_plan} - {self.new_plan}"
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "histórico de plano"
         verbose_name_plural = "histórico de planos"
 
@@ -144,6 +133,7 @@ class SubscriptionPlanHistory(models.Model):
 class Payment(models.Model):
 
     class Status(models.TextChoices):
+        RECEIVED  = "RECEIVED",  "Recebido"
         CONFIRMED = "CONFIRMED", "Confirmado"
         PENDING   = "PENDING",   "Pendente"
         OVERDUE   = "OVERDUE",   "Vencido"
@@ -161,7 +151,6 @@ class Payment(models.Model):
         return self.payment_id
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "cobrança"
         verbose_name_plural = "cobranças"
 
@@ -176,6 +165,5 @@ class Webhook(models.Model):
         return self.event_id
 
     class Meta:
-        ordering = ["id"]
         verbose_name = "webhook"
         verbose_name_plural = "webhooks"

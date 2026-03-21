@@ -1,4 +1,5 @@
 import requests
+from uuid import uuid4
 from urllib.parse import urlencode, urljoin
 from django.conf import settings
 
@@ -49,7 +50,7 @@ class AsaasCustomer(AsaasBase):
             method="GET",
         )
 
-    def create_customer(self, name, cpf_cnpj, email=None, mobile_phone=None, postal_code=None, address_number=None):
+    def create_customer(self, name, cpf_cnpj, email=None, mobile_phone=None, postal_code=None, address_number=None, complement=None):
         """ https://docs.asaas.com/reference/criar-novo-cliente """
         return self.send_request(
             path="customers",
@@ -61,10 +62,11 @@ class AsaasCustomer(AsaasBase):
                 "mobilePhone": mobile_phone,
                 "postalCode": postal_code,
                 "addressNumber": address_number,
+                "complement": complement,
             },
         )
 
-    def update_customer(self, customer_id, name=None, cpf_cnpj=None, email=None, mobile_phone=None, postal_code=None, address_number=None):
+    def update_customer(self, customer_id, name=None, cpf_cnpj=None, email=None, mobile_phone=None, postal_code=None, address_number=None, complement=None):
         """ https://docs.asaas.com/reference/atualizar-cliente-existente """
         body = {
             "name": name,
@@ -73,6 +75,7 @@ class AsaasCustomer(AsaasBase):
             "mobilePhone": mobile_phone,
             "postalCode": postal_code,
             "addressNumber": address_number,
+            "complement": complement,
         }
         body = {key: value for key, value in body.items() if value not in [None, "", [], {}]}
 
@@ -90,7 +93,30 @@ class AsaasCustomer(AsaasBase):
         )
 
 
-class AsaasSubscription(AsaasBase):
+class AsaasPixSubscription(AsaasBase):
+
+    def create_subscription(self, customer_id, value, cycle, next_due_date, description):
+        """ https://docs.asaas.com/reference/criar-uma-autorizacao-pix-automatico """
+        return self.send_request(
+            path="pix/automatic/authorizations",
+            method="POST",
+            body={
+                "customerId": customer_id,
+                "contractId": uuid4().hex,
+                "value": float(value),
+                "frequency": cycle,
+                "startDate": next_due_date,
+                "description": description,
+                "immediateQrCode": {
+                    "expirationSeconds": 3600,
+                    "originalValue": float(value),
+                    "description": description,
+                },
+            },
+        )
+
+
+class AsaasCreditCardSubscription(AsaasBase):
 
     def get_subscription(self, subscription_id):
         """ https://docs.asaas.com/reference/recuperar-uma-unica-assinatura """
@@ -99,30 +125,30 @@ class AsaasSubscription(AsaasBase):
             method="GET",
         )
 
-    def create_subscription(self, customer_id, billingType, cycle, value, next_due_date, description, credit_card, credit_card_holder_info):
+    def create_subscription(self, customer_id, value, cycle, next_due_date, description, credit_card, credit_card_holder_info):
         """ https://docs.asaas.com/reference/criar-assinatura-com-cartao-de-credito """
         return self.send_request(
             path="subscriptions",
             method="POST",
             body={
                 "customer": customer_id,
-                "billingType": billingType,
+                "value": float(value),
                 "cycle": cycle,
-                "value": value,
                 "nextDueDate": next_due_date,
                 "description": description,
+                "billingType": "CREDIT_CARD",
                 "creditCard": credit_card,
                 "creditCardHolderInfo": credit_card_holder_info,
             },
         )
 
-    def update_subscription(self, subscription_id, status=None, cycle=None, value=None, nextDueDate=None, description=None, updatePendingPayments=None):
+    def update_subscription(self, subscription_id, status=None, value=None, cycle=None, next_due_date=None, description=None, updatePendingPayments=None):
         """ https://docs.asaas.com/reference/atualizar-assinatura-existente """
         body = {
             "status": status,
+            "value": float(value) if value is not None else None,
             "cycle": cycle,
-            "value": value,
-            "nextDueDate": nextDueDate,
+            "nextDueDate": next_due_date,
             "description": description,
             "updatePendingPayments": updatePendingPayments,
         }
@@ -141,14 +167,52 @@ class AsaasSubscription(AsaasBase):
             method="DELETE",
         )
 
+    def update_credit_card(self, subscription_id, credit_card, credit_card_holder_info):
+        """ https://docs.asaas.com/reference/atualizar-cartao-de-credito-assinatura """
+        return self.send_request(
+            path=f"subscriptions/{subscription_id}/creditCard",
+            method="PUT",
+            body={
+                "creditCard": credit_card,
+                "creditCardHolderInfo": credit_card_holder_info,
+            },
+        )
+
 
 class AsaasPayment(AsaasBase):
 
-    def get_payment(self):
+    def list_payments(self, customer_id):
         """ https://docs.asaas.com/reference/listar-cobrancas """
         return self.send_request(
-            path=f"payments",
+            path=f"payments?customer={customer_id}",
             method="GET",
+        )
+
+    def get_payment(self, payment_id):
+        """ https://docs.asaas.com/reference/recuperar-uma-unica-cobranca """
+        return self.send_request(
+            path=f"payments/{payment_id}",
+            method="GET",
+        )
+
+    def create_payment(self, customer_id, value, due_date, description=None, external_reference=None, credit_card=None, credit_card_holder_info=None):
+        """ https://docs.asaas.com/reference/criar-nova-cobranca """
+        body = {
+            "customer": customer_id,
+            "value": float(value),
+            "dueDate": due_date,
+            "description": description,
+            "externalReference": external_reference,
+            "billingType": "CREDIT_CARD",
+            "creditCard": credit_card,
+            "creditCardHolderInfo": credit_card_holder_info,
+        }
+        body = {key: value for key, value in body.items() if value not in [None, "", [], {}]}
+
+        return self.send_request(
+            path=f"payments",
+            method="POST",
+            body=body,
         )
 
     def delete_payment(self, payment_id):
@@ -156,4 +220,11 @@ class AsaasPayment(AsaasBase):
         return self.send_request(
             path=f"payments/{payment_id}",
             method="DELETE",
+        )
+
+    def refund_payment(self, payment_id):
+        """ https://docs.asaas.com/reference/estornar-cobranca """
+        return self.send_request(
+            path=f"payments/{payment_id}/refund",
+            method="POST",
         )

@@ -1,0 +1,79 @@
+<c-vars class label description name errors />
+
+<div
+    x-data="{
+        open: false,
+        selected: [],
+        search: '',
+        normalize(string) {
+            return string ? string.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() : ''
+        },
+        get filteredOptions() {
+            return {{ options }}.filter(option => this.normalize(option.name).includes(this.normalize(this.search)))
+        },
+        get selectedNames() {
+            return {{ options }}.filter(option => this.selected.includes(option.id)).map(option => option.name)
+        },
+    }"
+    x-modelable="selected"
+    {{ attrs }}
+    class="{{ class }} space-y-2"
+>
+    {% if label %}
+        <p class="font-medium text-white text-sm">{{ label }}</p>
+    {% endif %}
+    {% if description %}
+        <p class="text-gray-300 text-xs">{{ description }}</p>
+    {% endif %}
+    <div class="relative w-full max-w-sm">
+        <div
+            :class="{ 'border-blue-600': open }"
+            class="flex justify-between items-center p-2 border border-[#323232] rounded-sm text-gray-300 text-sm duration-300 cursor-pointer"
+            @click="
+                open =! open
+                if (open) $nextTick(() => $refs.search.focus())
+            "
+        >
+            <p class="truncate" x-text="selectedNames.join(', ')"></p>
+            <c-icon.solid.20.chevron_up_down class="shrink-0"></c-icon.solid.20.chevron_up_down>
+        </div>
+        <div
+            class="top-12 left-0 z-10 absolute bg-[#101010] border border-[#323232] rounded-sm w-full max-w-sm h-38 overflow-y-auto"
+            @click.outside="open = false"
+            x-show="open"
+            x-cloak
+        >
+            <div class="relative">
+                <c-icon.solid.20.magnifying-glass class="top-2.5 left-2 -z-10 absolute text-white cursor-text"></c-icon.solid.20.magnifying-glass>
+                <input class="px-10 py-2 outline-none w-full text-gray-300" x-model="search" x-ref="search" type="text" />
+                <div class="border-[#323232] border-b"></div>
+            </div>
+            <template x-for="option in filteredOptions" :key="option.id">
+                <div
+                    :class="{ 'bg-[#212121]': selected.includes(option.id) }"
+                    class="flex justify-between items-center gap-2 hover:bg-[#212121] p-2 text-gray-300 text-sm duration-300 cursor-pointer"
+                    @click="
+                        if (selected.includes(option.id)) {
+                            selected = selected.filter(id => id != option.id)
+                        } else {
+                            selected.push(option.id)
+                        }
+                    "
+                >
+                    <p x-text="option.name"></p>
+                    {% if slot %}
+                        {{ slot }}
+                    {% else%}
+                        <c-icon.solid.20.check class="shrink-0" x-show="selected.includes(option.id)" x-cloak></c-icon.solid.20.check>
+                    {% endif %}
+                </div>
+            </template>
+            <template x-if="filteredOptions.length == 0">
+                <p class="flex justify-center items-center h-26 text-gray-300 text-sm text-center">Nenhum resultado encontrado</p>
+            </template>
+        </div>
+    </div>
+    {% for error in errors %}
+        <p class="text-red-500 text-xs">{{ error }}</p>
+    {% endfor %}
+</div>

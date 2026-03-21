@@ -1,0 +1,16 @@
+<c-vars class label description name errors checked />
+
+<div class="{{ class }} space-y-2 w-fit">
+    {% if label %}
+        <label class="block font-medium text-white text-sm" for="{{ name }}">{{ label }}</label>
+    {% endif %}
+
+    {% if description %}
+        <p class="text-gray-300 text-xs">{{ description }}</p>
+    {% endif %}
+
+    <label class="cursor-pointer">
+        <input class="sr-only peer" name="{{ name }}" type="checkbox" {% if checked %}checked{% endif %} {{ attrs }}>
+        <div class="peer after:top-0.5 after:absolute relative bg-[#323232] after:bg-white peer-checked:bg-blue-600 rounded-full after:rounded-full peer-focus:outline-none w-11 after:w-5 h-6 after:h-5 after:content-[''] after:transition-all rtl:peer-checked:after:-translate-x-full peer-checked:after:translate-x-full after:start-0.5"></div>
+    </label>
+</div>
