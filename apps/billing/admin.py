@@ -1,13 +1,12 @@
-from unfold.admin import ModelAdmin, TabularInline
+from unfold.admin import ModelAdmin
 from django.contrib import admin
-from apps.payment import models
+from apps.billing import models
 
 
 @admin.register(models.Plan)
 class PlanAdmin(ModelAdmin):
     list_per_page = 20
-    list_display = ["name", "value", "cycle", "billing_type", "active", "free_period", "refund_period", "created_at"]
-    list_filter = ["active"]
+    list_display = ["name", "value", "cycle", "active", "free_period", "refund_period", "created_at"]
     search_fields = ["name"]
 
 
@@ -15,7 +14,6 @@ class PlanAdmin(ModelAdmin):
 class CouponAdmin(ModelAdmin):
     list_per_page = 20
     list_display = ["code", "discount", "maximum_uses", "total_uses", "active", "activation_date", "deactivation_date", "created_at"]
-    list_filter = ["active"]
     search_fields = ["code"]
 
 
@@ -24,16 +22,13 @@ class CustomerAdmin(ModelAdmin):
     list_per_page = 20
     list_display = ["user", "created_at"]
     search_fields = ["user__email", "customer_id"]
-    autocomplete_fields = ["user"]
 
 
 @admin.register(models.Subscription)
 class SubscriptionAdmin(ModelAdmin):
     list_per_page = 20
-    list_display = ["get_user", "plan", "coupon", "status", "next_due", "created_at"]
-    list_filter = ["status"]
+    list_display = ["get_user", "plan", "coupon", "billing_type", "status", "next_due", "created_at"]
     search_fields = ["customer__user__email", "customer__customer_id", "subscription_id"]
-    autocomplete_fields = ["customer", "plan", "coupon"]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -41,7 +36,6 @@ class SubscriptionAdmin(ModelAdmin):
 
     def get_user(self, obj):
         return obj.customer.user.email
-
     get_user.short_description = "Usuário"
     get_user.admin_order_field = "subscription__customer__user__email"
 
@@ -50,9 +44,7 @@ class SubscriptionAdmin(ModelAdmin):
 class SubscriptionStatusHistoryAdmin(ModelAdmin):
     list_per_page = 20
     list_display = ["get_user", "status", "created_at"]
-    list_filter = ["status"]
     search_fields = ["subscription__customer__user__email", "subscription__customer__customer_id", "subscription__subscription_id"]
-    autocomplete_fields = ["subscription"]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -60,7 +52,6 @@ class SubscriptionStatusHistoryAdmin(ModelAdmin):
 
     def get_user(self, obj):
         return obj.subscription.customer.user.email
-
     get_user.short_description = "Usuário"
     get_user.admin_order_field = "subscription__customer__user__email"
 
@@ -69,9 +60,7 @@ class SubscriptionStatusHistoryAdmin(ModelAdmin):
 class SubscriptionPlanHistoryAdmin(ModelAdmin):
     list_per_page = 20
     list_display = ["get_user", "old_plan", "new_plan", "status", "created_at"]
-    list_filter = ["status"]
     search_fields = ["subscription__customer__user__email", "subscription__customer__customer_id", "subscription__subscription_id"]
-    autocomplete_fields = ["subscription", "old_plan", "new_plan"]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -79,7 +68,6 @@ class SubscriptionPlanHistoryAdmin(ModelAdmin):
 
     def get_user(self, obj):
         return obj.subscription.customer.user.email
-
     get_user.short_description = "Usuário"
     get_user.admin_order_field = "subscription__customer__user__email"
 
@@ -88,9 +76,7 @@ class SubscriptionPlanHistoryAdmin(ModelAdmin):
 class PaymentAdmin(ModelAdmin):
     list_per_page = 20
     list_display = ["get_user", "status", "value", "paid_at", "due_date", "created_at"]
-    list_filter = ["status"]
     search_fields = ["subscription__customer__user__email", "subscription__customer__customer_id", "subscription__subscription_id", "payment_id"]
-    autocomplete_fields = ["subscription"]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -98,7 +84,6 @@ class PaymentAdmin(ModelAdmin):
 
     def get_user(self, obj):
         return obj.subscription.customer.user.email
-
     get_user.short_description = "Usuário"
     get_user.admin_order_field = "subscription__customer__user__email"
 
@@ -108,7 +93,6 @@ class WebhookAdmin(ModelAdmin):
     list_per_page = 20
     list_display = ["get_user", "event_id", "created_at"]
     search_fields = ["subscription__customer__user__email", "subscription__customer__customer_id", "subscription__subscription_id", "event_id"]
-    autocomplete_fields = ["subscription"]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -116,6 +100,5 @@ class WebhookAdmin(ModelAdmin):
 
     def get_user(self, obj):
         return obj.subscription.customer.user.email
-
     get_user.short_description = "Usuário"
     get_user.admin_order_field = "subscription__customer__user__email"

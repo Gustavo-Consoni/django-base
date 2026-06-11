@@ -2,6 +2,7 @@ services:
   django:
     build: .
     container_name: django
+    entrypoint: /app/entrypoint.sh
     volumes:
       - media_data:/app/media
       - static_data:/app/staticfiles
@@ -10,10 +11,38 @@ services:
       - .env
     depends_on:
       - postgres
+      - redis
+    restart: always
+
+  celery:
+    build: .
+    container_name: celery
+    command: celery -A core worker --loglevel=info
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    restart: always
+
+  celery-beat:
+    build: .
+    container_name: celery-beat
+    command: celery -A core beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    restart: always
+
+  redis:
+    image: redis:8.6.2-alpine
+    container_name: redis
+    volumes:
+      - redis_data:/data
     restart: always
 
   nginx:
-    image: nginx:1.28.0
+    image: nginx:1.28.3-alpine
     container_name: nginx
     ports:
       - "443:443"
@@ -28,7 +57,7 @@ services:
     restart: always
 
   postgres:
-    image: postgres:17.6
+    image: postgres:17.9
     container_name: postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -39,5 +68,6 @@ services:
 volumes:
   media_data:
   static_data:
+  redis_data:
   postgres_data:
   gunicorn_socket:
