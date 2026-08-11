@@ -1,5 +1,4 @@
 import requests
-from uuid import uuid4
 from urllib.parse import urlencode, urljoin
 from django.conf import settings
 
@@ -43,6 +42,13 @@ class AsaasBase:
 
 class AsaasCustomer(AsaasBase):
 
+    def get_customer(self, customer_id):
+        """ https://docs.asaas.com/reference/recuperar-um-unico-cliente """
+        return self.send_request(
+            path=f"customers/{customer_id}",
+            method="GET",
+        )
+
     def create_customer(self, name, cpf_cnpj, email=None, mobile_phone=None, postal_code=None, address_number=None, complement=None):
         """ https://docs.asaas.com/reference/criar-novo-cliente """
         return self.send_request(
@@ -56,6 +62,7 @@ class AsaasCustomer(AsaasBase):
                 "postalCode": postal_code,
                 "addressNumber": address_number,
                 "complement": complement,
+                "notificationDisabled": True,
             },
         )
 
@@ -86,59 +93,79 @@ class AsaasCustomer(AsaasBase):
         )
 
 
-class AsaasPayment(AsaasBase):
+class AsaasSubscription(AsaasBase):
 
-    def create_pix_authorization(self, customer_id, value, cycle, next_due_date, description):
+    def create_pix_subscription(self, contract_id, customer_id, first_value, recurring_value, cycle, due_date, description, payment_creation_mode="SUBSCRIPTION"):
         """ https://docs.asaas.com/reference/criar-uma-autorizacao-pix-automatico """
         return self.send_request(
             path="pix/automatic/authorizations",
             method="POST",
             body={
-                "contractId": uuid4().hex,
+                "contractId": contract_id,
                 "customerId": customer_id,
-                "value": float(value),
+                "value": float(recurring_value),
                 "frequency": cycle,
-                "startDate": next_due_date,
+                "startDate": due_date,
                 "description": description,
                 "immediateQrCode": {
                     "expirationSeconds": 3600,
-                    "originalValue": float(value),
+                    "originalValue": float(first_value),
                     "description": description,
                 },
+                "paymentCreationMode": payment_creation_mode,
             },
         )
 
-    def delete_pix_authorization(self, authorization_id):
+    def delete_pix_subscription(self, pix_authorization_id):
         """ https://docs.asaas.com/reference/cancelar-uma-autorizacao-pix-automatico """
         return self.send_request(
-            path=f"pix/automatic/authorizations/{authorization_id}",
+            path=f"pix/automatic/authorizations/{pix_authorization_id}",
             method="DELETE",
         )
 
-    def create_pix_payment(self, customer_id, value, due_date, description, authorization_id, external_reference=None):
-        """ https://docs.asaas.com/reference/criar-nova-cobranca """
+    def create_credit_card_subscription(self, customer_id, value, next_due_date, description, external_reference=None, credit_card=None, credit_card_holder_info=None, credit_card_token=None):
+        """ https://docs.asaas.com/reference/criar-nova-assinatura """
         body = {
-            "billingType": "PIX",
             "customer": customer_id,
+            "billingType": "CREDIT_CARD",
             "value": float(value),
-            "dueDate": due_date,
+            "nextDueDate": next_due_date,
             "description": description,
             "externalReference": external_reference,
-            "pixAutomaticAuthorizationId": authorization_id,
+            "creditCard": credit_card,
+            "creditCardHolderInfo": credit_card_holder_info,
+            "creditCardToken": credit_card_token,
         }
         body = {key: value for key, value in body.items() if value not in [None, "", [], {}]}
 
         return self.send_request(
-            path="payments",
+            path=f"subscriptions",
             method="POST",
             body=body,
         )
 
-    def create_credit_card_payment(self, customer_id, value, due_date, description, credit_card=None, credit_card_holder_info=None, credit_card_token=None, external_reference=None):
+    def delete_credit_card_subscription(self, subscription_id):
+        """ https://docs.asaas.com/reference/remover-assinatura """
+        return self.send_request(
+            path=f"subscriptions/{subscription_id}",
+            method="DELETE",
+        )
+
+
+class AsaasPayment(AsaasBase):
+
+    def get_payment(self, payment_id):
+        """ https://docs.asaas.com/reference/recuperar-uma-unica-cobranca """
+        return self.send_request(
+            path=f"payments/{payment_id}",
+            method="GET",
+        )
+
+    def create_payment(self, customer_id, billing_type, value, due_date, description, external_reference=None, credit_card=None, credit_card_holder_info=None, credit_card_token=None, pix_authorization_id=None):
         """ https://docs.asaas.com/reference/criar-nova-cobranca """
         body = {
-            "billingType": "CREDIT_CARD",
             "customer": customer_id,
+            "billingType": billing_type,
             "value": float(value),
             "dueDate": due_date,
             "description": description,
@@ -146,6 +173,7 @@ class AsaasPayment(AsaasBase):
             "creditCard": credit_card,
             "creditCardHolderInfo": credit_card_holder_info,
             "creditCardToken": credit_card_token,
+            "pixAutomaticAuthorizationId": pix_authorization_id,
         }
         body = {key: value for key, value in body.items() if value not in [None, "", [], {}]}
 
@@ -167,4 +195,16 @@ class AsaasPayment(AsaasBase):
         return self.send_request(
             path=f"payments/{payment_id}/refund",
             method="POST",
+        )
+
+    def tokenize_credit_card(self, customer_id, credit_card, credit_card_holder_info):
+        """ https://docs.asaas.com/reference/tokenizacao-de-cartao-de-credito """
+        return self.send_request(
+            path=f"creditCard/tokenizeCreditCard",
+            method="POST",
+            body={
+                "customer": customer_id,
+                "creditCard": credit_card,
+                "creditCardHolderInfo": credit_card_holder_info,
+            },
         )

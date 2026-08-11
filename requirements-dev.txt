@@ -1,12 +1,16 @@
 Django==5.2.*
-djangorestframework
-django-tailwind-cli
 django-debug-toolbar
+django-tailwind-cli
+djangorestframework
 django-unfold
 django-cotton
 
 pillow
+pywebpush
 python-decouple
 
+sentry-sdk
 gunicorn
 psycopg[binary]
+celery[redis]
+django-celery-beat

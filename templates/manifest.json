@@ -1,8 +1,8 @@
 {
-    "id": "spacepro",
-    "name": "SpacePro",
-    "short_name": "SpacePro",
-    "description": "Plataforma de treino para resultados consistentes",
+    "id": "br.com.dindinja",
+    "name": "Dindinja",
+    "short_name": "Dindinja",
+    "description": "Plataforma de parceria entre empresários e funcionários",
     "start_url": "/entrar",
     "scope": "/",
     "dir": "ltr",
@@ -11,10 +11,6 @@
     "background_color": "#212121",
     "orientation": "portrait",
     "display": "standalone",
-    "display_override": [
-        "standalone",
-        "fullscreen"
-    ],
     "categories": [
         "fitness",
         "health"
@@ -37,19 +33,19 @@
     ],
     "screenshots": [
         {
-            "src": "/static/images/screenshots/login.png",
+            "src": "/static/images/screenshots/1.png",
             "sizes": "1290x2796",
             "type": "image/png"
         },
         {
-            "src": "/static/images/screenshots/workouts.jpg",
+            "src": "/static/images/screenshots/2.jpg",
             "sizes": "1290x2796",
-            "type": "image/jpeg"
+            "type": "image/png"
         },
         {
-            "src": "/static/images/screenshots/workout.jpg",
+            "src": "/static/images/screenshots/3.jpg",
             "sizes": "1290x2796",
-            "type": "image/jpeg"
+            "type": "image/png"
         }
     ]
 }

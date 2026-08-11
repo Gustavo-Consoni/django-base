@@ -1,0 +1,181 @@
+{% load static %}
+
+
+<div class="flex justify-between items-center" x-data="navbar">
+    <a href="">
+        <img class="w-10 sm:w-12" src="{% static 'images/logo/colada-sem-fundo-192x192.png' %}" loading="lazy">
+    </a>
+
+    <div class="flex items-center gap-8">
+        <button class="cursor-pointer" @click="window.history.length > 1 ? history.back() : window.location.href = '/'">
+            <c-icon.outline.arrow_uturn_left class="text-white"></c-icon.outline.arrow_uturn_left>
+        </button>
+        <button class="relative cursor-pointer" @click="notificationSlideOver = true">
+            <c-icon.outline.bell class="text-white"></c-icon.outline.bell>
+            <div class="-top-1 -right-1 absolute bg-red-600 rounded-full size-4 text-white text-xs">0</div>
+        </button>
+        <button class="cursor-pointer" @click="menu = true">
+            <c-icon.outline.bars_3 class="text-white"></c-icon.outline.bars_3>
+        </button>
+    </div>
+
+    <c-slide_over title="Notificações" variable="notificationSlideOver">
+        <div class="flex-1"></div>
+        <div>
+            <p class="font-medium text-sm">Está tendo problemas para receber notificações?</p>
+            <p class="mt-2 mb-4 text-gray-600 text-sm">Clique no botão abaixo para garantir que os envios voltem a ser recebidos no seu celular</p>
+            <c-html.button class="w-full" variant="confirm" @click="subscribeUser(true)" type="button">Reconfigurar</c-html.button>
+        </div>
+    </c-slide_over>
+
+    <c-slide_over variable="menu">
+        <img class="rounded-full size-20" src="">
+        <div class="text-sm">
+            <a class="flex items-center gap-4 py-4 border-gray-200 border-b" href="">
+                <c-icon.outline.home></c-icon.home>
+                <p>Início</p>
+            </a>
+            <a class="flex items-center gap-4 py-4 border-gray-200 border-b" href="">
+                <c-icon.outline.document_plus></c-icon.document_plus>
+                <p>Cadastrar Vaga</p>
+            </a>
+            <a class="flex items-center gap-4 py-4 border-gray-200 border-b" href="">
+                <c-icon.outline.clipboard_document></c-icon.clipboard_document>
+                <p>Vagas Abertas</p>
+            </a>
+            <a class="flex items-center gap-4 py-4 border-gray-200 border-b" href="">
+                <c-icon.outline.clipboard_document_check></c-icon.clipboard_document_check>
+                <p>Vagas Preenchidas</p>
+            </a>
+            <a class="flex items-center gap-4 py-4 border-gray-200 border-b" href="">
+                <c-icon.outline.clipboard_document_list></c-icon.clipboard_document_list>
+                <p>Histórico de Vagas</p>
+            </a>
+            <a class="flex items-center gap-4 py-4 border-gray-200 border-b" href="">
+                <c-icon.outline.user></c-icon.user>
+                <p>Perfil</p>
+            </a>
+            <a class="flex items-center gap-4 py-4 border-gray-200 border-b" href="{% url 'logout' %}">
+                <c-icon.outline.arrow_left_start_on_rectangle></c-icon.arrow_left_start_on_rectangle>
+                <p>Sair</p>
+            </a>
+        </div>
+    </c-slide_over>
+
+    <c-modal class="space-y-4 p-4" variable="webpushModal" click="dismissModal()">
+        <div class="flex justify-between items-center">
+            <p class="font-medium">Ative as notificações</p>
+            <button class="cursor-pointer" @click="dismissModal()" type="button">
+                <c-icon.solid.20.x_mark></c-icon.solid.20.x_mark>
+            </button>
+        </div>
+        <div class="border-gray-200 border-t"></div>
+        <p class="text-gray-600 text-sm">Fique por dentro das novidades em tempo real, receba alertas instantâneos sobre vagas e conteúdos importantes para você</p>
+        <c-html.button class="w-full" variant="confirm" @click="subscribeUser()" type="button">Permitir</c-html.button>
+    </c-modal>
+</div>
+
+
+<script>
+document.addEventListener("alpine:init", () => {
+    Alpine.data("navbar", () => ({
+
+        menu: false,
+        notificationSlideOver: false,
+        webpushModal: false,
+        cooldownDays: 3,
+
+        async init() {
+            if (!this.isSupported()) return
+            if (Notification.permission !== "default") return
+
+            const dismissedAt = localStorage.getItem("webpush_modal_dismissed_at")
+            if (dismissedAt) {
+                const elapsed = Date.now() - parseInt(dismissedAt)
+                const cooldown = this.cooldownDays * 24 * 60 * 60 * 1000
+                if (elapsed < cooldown) return
+            }
+
+            this.webpushModal = true
+        },
+
+        isSupported() {
+            return "Notification" in window && "serviceWorker" in navigator && "PushManager" in window
+        },
+
+        dismissModal() {
+            this.webpushModal = false
+            localStorage.setItem("webpush_modal_dismissed_at", Date.now())
+        },
+
+        async subscribeUser() {
+            this.webpushModal = false
+            this.notificationSlideOver = false
+
+            if (!this.isSupported()) {
+                alert("Seu navegador não suporta notificações. Use Google Chrome ou Safari para ativar")
+                return
+            }
+
+            if (Notification.permission === "denied") {
+                alert("Você bloqueou as notificações. Para receber, habilite manualmente nas configurações do seu navegador")
+                return
+            }
+
+            try {
+                const permission = await Notification.requestPermission()
+
+                if (permission === "denied") {
+                    alert("Você bloqueou as notificações. Para receber, habilite manualmente nas configurações do seu navegador")
+                    return
+                }
+
+                if (permission !== "granted") {
+                    localStorage.setItem("webpush_modal_dismissed_at", Date.now())
+                    return
+                }
+
+                const reg = await navigator.serviceWorker.ready
+                let sub = await reg.pushManager.getSubscription()
+
+                if (sub) {
+                    await sub.unsubscribe()
+                }
+
+                sub = await reg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: this.urlBase64ToUint8Array("{{ vapid_public_key }}"),
+                })
+
+                const response = await fetch("{% url 'webpush_subscribe' %}", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": "{{ csrf_token }}",
+                    },
+                    body: JSON.stringify(sub.toJSON()),
+                })
+
+                if (!response.ok) {
+                    await sub.unsubscribe()
+                    throw new Error(`Servidor retornou status ${response.status}`)
+                }
+
+                localStorage.removeItem("webpush_modal_dismissed_at")
+                alert("Notificações ativadas com sucesso!")
+            } catch (error) {
+                console.error("Erro ao inscrever push:", error)
+                alert("Não foi possível ativar as notificações agora. Tente novamente mais tarde")
+            }
+        },
+
+        urlBase64ToUint8Array(base64String) {
+            const padding = "=".repeat((4 - base64String.length % 4) % 4)
+            const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/")
+            const rawData = atob(base64)
+            return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)))
+        },
+
+    }))
+})
+</script>

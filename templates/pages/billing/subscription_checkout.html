@@ -1,0 +1,358 @@
+{% extends "layouts/centralized.html" %}
+{% load static %}
+
+
+{% block "head" %}
+<script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/mask@3.15.12/dist/cdn.min.js"></script>
+{% endblock %}
+
+
+{% block "body" %}
+<div class="-z-10 fixed inset-0 mx-auto max-w-xl pointer-events-none">
+    <div class="top-32 left-8 absolute bg-blue-600/30 blur-[128px] rounded-full size-64"></div>
+    <div class="right-8 bottom-0 absolute bg-blue-600/30 blur-[128px] rounded-full size-64"></div>
+    <div class="top-0 absolute bg-linear-to-b from-[#101010] to-transparent w-full h-8"></div>
+</div>
+
+<form class="space-y-8 w-full max-w-md" @submit.prevent="subscriptionSign()">
+    <div class="flex justify-center items-center gap-x-4">
+        <img class="h-12" src="{% static 'images/logo/colada-sem-fundo-192x192.png' %}" loading="lazy">
+        <div>
+            <p class="font-teko font-semibold text-2xl">Assinatura SpacePro</p>
+            <p class="text-gray-300 text-sm">Sua próxima versão começa aqui</p>
+        </div>
+    </div>
+    <div class="space-y-8">
+        <c-html.input.select
+            label="Selecione um plano"
+            options="plans"
+            variable="subscription.plan"
+            errors="subscription_errors.plan"
+            required
+        ></c-html.input.select>
+        <div class="space-y-2">
+            <div class="flex items-center gap-2 mb-4">
+                <c-icon.outline.user></c-icon.outline.user>
+                <p class="font-medium text-sm">Dados da conta</p>
+            </div>
+            <c-html.input
+                placeholder="Nome Completo"
+                name="full_name"
+                x-model="subscription.full_name"
+                errors="subscription_errors.full_name"
+                type="text"
+                maxlength="100"
+                required
+            ></c-html.input>
+            <c-html.input
+                placeholder="Email"
+                name="email"
+                x-model="subscription.email"
+                errors="subscription_errors.email"
+                type="email"
+                maxlength="100"
+                required
+            ></c-html.input>
+            <div class="gap-4 grid grid-cols-2">
+                <c-html.input
+                    placeholder="Telefone"
+                    name="phone_number"
+                    x-model="subscription.phone_number"
+                    errors="subscription_errors.phone_number"
+                    x-mask="(99) 99999-9999"
+                    type="text"
+                    minlength="15"
+                    required
+                ></c-html.input>
+                <c-html.input
+                    placeholder="Data de Nascimento"
+                    name="birth_date"
+                    x-model="subscription.birth_date"
+                    errors="subscription_errors.birth_date"
+                    x-mask="99/99/9999"
+                    type="text"
+                    minlength="10"
+                    required
+                ></c-html.input>
+            </div>
+            <c-html.input
+                placeholder="Senha"
+                name="password"
+                x-model="subscription.password"
+                errors="subscription_errors.password"
+                type="password"
+                maxlength="32"
+                minlength="8"
+                required
+            ></c-html.input>
+        </div>
+        <div class="space-y-2">
+            <div class="flex items-center gap-2 mb-4">
+                <c-icon.outline.banknotes></c-icon.outline.banknotes>
+                <p class="font-medium text-sm">Forma de pagamento</p>
+            </div>
+            <div class="gap-4 grid grid-cols-2">
+                <button
+                    :class="subscription.billing_type == 'PIX' ? 'border-yellow-300 text-yellow-300' : 'border-white/10'"
+                    class="flex flex-col items-center gap-y-2 bg-white/5 p-4 border rounded-lg cursor-pointer Z"
+                    @click="subscription.billing_type = 'PIX'"
+                    type="button"
+                >
+                    <c-icon.outline.qr_code></c-icon.outline.qr_code>
+                    <span>PIX</span>
+                </button>
+                <button
+                    :class="subscription.billing_type == 'CREDIT_CARD' ? 'border-yellow-300 text-yellow-300' : 'border-white/10'"
+                    class="flex flex-col items-center gap-y-2 bg-white/5 p-4 border rounded-lg cursor-pointer Z"
+                    @click="subscription.billing_type = 'CREDIT_CARD'"
+                    type="button"
+                >
+                    <c-icon.outline.credit_card></c-icon.outline.credit_card>
+                    <span class="text-sm">Cartão de crédito</span>
+                </button>
+            </div>
+        </div>
+        <div class="space-y-2">
+            <div class="flex items-center gap-2 mb-4">
+                <c-icon.outline.wallet></c-icon.outline.wallet>
+                <p class="font-medium text-sm">Dados de pagamento</p>
+            </div>
+            <div class="gap-4 grid grid-cols-2">
+                <c-html.input
+                    placeholder="CEP"
+                    name="postal_code"
+                    x-model="subscription.postal_code"
+                    errors="subscription_errors.postal_code"
+                    x-mask="99999-999"
+                    type="text"
+                    required
+                ></c-html.input>
+                <c-html.input
+                    placeholder="Número Residencial"
+                    name="address_number"
+                    x-model="subscription.address_number"
+                    errors="subscription_errors.address_number"
+                    type="text"
+                    maxlength="5"
+                    required
+                ></c-html.input>
+            </div>
+            <c-html.input
+                placeholder="CPF"
+                name="cpf"
+                x-model="subscription.cpf"
+                errors="subscription_errors.cpf"
+                x-mask="999.999.999-99"
+                type="text"
+                required
+            ></c-html.input>
+            <template x-if="subscription.billing_type == 'CREDIT_CARD'">
+                <div class="space-y-2">
+                    <c-html.input
+                        placeholder="Titular do Cartão"
+                        name="holder_name"
+                        x-model="subscription.holder_name"
+                        errors="subscription_errors.holder_name"
+                        type="text"
+                        maxlength="100"
+                        required
+                    ></c-html.input>
+                    <c-html.input
+                        placeholder="Número do Cartão"
+                        name="number"
+                        x-model="subscription.number"
+                        errors="subscription_errors.number"
+                        x-mask="9999 9999 9999 9999"
+                        type="text"
+                        required
+                    ></c-html.input>
+                    <div class="gap-4 grid grid-cols-2">
+                        <c-html.input
+                            placeholder="Data de Validade"
+                            name="expiry_date"
+                            x-model="subscription.expiry_date"
+                            errors="subscription_errors.expiry_date"
+                            x-mask="99/99"
+                            type="text"
+                            required
+                        ></c-html.input>
+                        <c-html.input
+                            placeholder="Código de Segurança"
+                            name="ccv"
+                            x-model="subscription.ccv"
+                            errors="subscription_errors.ccv"
+                            x-mask="9999"
+                            type="text"
+                            required
+                        ></c-html.input>
+                    </div>
+                </div>
+            </template>
+        </div>
+        <div class="space-y-4">
+            <p class="text-sm text-center">
+                Ao concluir sua assinatura, você declara estar de acordo com os
+                <c-html.a variant="link" href="{% url 'terms_of_use' %}" target="_blank">termos de uso</c-html.a>
+                e as
+                <c-html.a variant="link" href="{% url 'privacy_policy' %}" target="_blank">políticas de privacidade</c-html.a>
+                da nossa plataforma
+            </p>
+            <c-html.button class="w-full" variant="confirm" ::disabled="loading" type="submit">
+                <c-icon.solid.20.arrow_path class="animate-spin" x-show="loading" x-cloak></c-icon.solid.20.arrow_path>
+                <p x-text="loading ? 'Assinando' : 'Assinar'"></p>
+            </c-html.button>
+        </div>
+        <div class="text-center">
+            <span class="text-sm">Já possui cadastro?</span>
+            <c-html.a variant="link" href="{% url 'login' %}">Acessar plataforma</c-html.a>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+
+{% block "components" %}
+<c-modal class="space-y-4 p-4 w-sm" variable="qrcode_modal.show">
+    <div class="space-y-2 text-center">
+        <p class="font-teko font-semibold text-3xl">Aguardando Pagamento</p>
+        <p class="text-gray-300 text-sm">Escaneie o QRCode usando o aplicativo do seu banco para finalizar a assinatura via PIX</p>
+    </div>
+    <img class="mx-auto rounded-2xl" :src="'data:image/png;base64,' + qrcode_modal.encoded_image">
+    <div class="space-y-4">
+        <c-html.input x-model="qrcode_modal.payload" disabled></c-html.input>
+        <c-html.button
+            class="w-full"
+            variant="confirm"
+            @click="navigator.clipboard.writeText(qrcode_modal.payload); $dispatch('show-message', { message: 'Código copiado!', messageType: 'success' })"
+            type="button"
+        >Copiar</c-html.button>
+    </div>
+    <p class="text-gray-300 text-sm text-center">Se o QRCode não funcionar, infelizmente seu banco não aceita assinatura via PIX, por favor tente outra instituição</p>
+</c-modal>
+{% endblock %}
+
+
+{% block "script" %}
+<script>
+document.addEventListener("alpine:init", () => {
+    Alpine.data("alpine", () => ({
+
+        loading: false,
+        polling_interval: {
+            time: null,
+            token: null,
+        },
+        qrcode_modal: {
+            show: false,
+            payload: null,
+            encoded_image: null
+        },
+        subscription: {
+            plan: new URLSearchParams(window.location.search).get("plano"),
+            billing_type: "PIX",
+        },
+        subscription_errors: {},
+        plans: [
+            {
+                id: "masculino - mensal",
+                name: "Plano Masculino - R$ 49,90 / mês",
+            },
+            {
+                id: "feminino - mensal",
+                name: "Plano Feminino - R$ 49,90 / mês",
+            },
+            {
+                id: "casal - mensal",
+                name: "Plano Casal - R$ 79,90 / mês",
+            },
+            {
+                id: "masculino - anual",
+                name: "Plano Masculino - R$ 499,90 / ano",
+            },
+            {
+                id: "feminino - anual",
+                name: "Plano Feminino - R$ 499,90 / ano",
+            },
+            {
+                id: "casal - anual",
+                name: "Plano Casal - R$ 799,90 / ano",
+            },
+        ],
+
+        subscriptionSign() {
+            if (this.qrcode_modal.encoded_image) {
+                this.qrcode_modal.show = true
+                return
+            }
+
+            if (this.loading) return
+            this.loading = true
+
+            const payload = { ...this.subscription }
+            if (payload.billing_type != "CREDIT_CARD") {
+                delete payload.holder_name
+                delete payload.number
+                delete payload.expiry_date
+                delete payload.ccv
+            }
+
+            fetch("{% url 'subscription_sign' %}", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": "{{ csrf_token }}",
+                },
+                body: JSON.stringify(payload),
+            })
+            .then(async response => {
+                const data = await response.json()
+                if (!response.ok) throw data
+                return data
+            })
+            .then(data => {
+                if (this.subscription.billing_type == "PIX") {
+                    this.polling_interval.token = data.token
+                    this.qrcode_modal.encoded_image = data.encoded_image
+                    this.qrcode_modal.payload = data.payload
+                    this.qrcode_modal.show = true
+                    this.subscriptionPolling()
+                } else if (this.subscription.billing_type == "CREDIT_CARD") {
+                    window.location.href = "{% url 'subscription_completed' %}"
+                }
+            })
+            .catch(data => {
+                this.subscription_errors = data
+                this.$dispatch("show-message", {
+                    message: data.detail,
+                    messageType: data.detail_type,
+                })
+            })
+            .finally(() => {
+                this.loading = false
+            })
+        },
+
+        subscriptionPolling() {
+            const maxDuration = 60 * 60 * 1000
+            const startTime = Date.now()
+
+            this.polling_interval.time = setInterval(() => {
+                if (Date.now() - startTime >= maxDuration) {
+                    clearInterval(this.polling_interval.time)
+                    return
+                }
+
+                fetch(`{% url 'subscription_polling' %}?token=${this.polling_interval.token}`)
+                .then(response => {
+                    if (response.ok) {
+                        clearInterval(this.polling_interval.time)
+                        window.location.href = "{% url 'subscription_completed' %}"
+                    }
+                })
+            }, 10000)
+        },
+
+    }))
+})
+</script>
+{% endblock %}

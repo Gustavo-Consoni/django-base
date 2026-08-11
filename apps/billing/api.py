@@ -1,23 +1,27 @@
 import json
-from datetime import timedelta
+from uuid import uuid4
+from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from django.core import signing
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
-from django.contrib.auth.models import Group
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from apps.account.models import User, Company, Employee
-from apps.billing.asaas import AsaasCustomer, AsaasPayment
-from apps.billing.serializers import SubscriptionCompanySignSerializer, SubscriptionEmployeeSignSerializer
-from apps.billing.models import Subscription, SubscriptionStatusHistory, SubscriptionPlanHistory, Customer, Payment, Webhook
+from apps.account.models import User
+from apps.billing.asaas import AsaasCustomer, AsaasSubscription
+from apps.billing.serializers import SubscriptionSignSerializer
+from apps.billing.utils import activate_subscription, deactivate_subscription
+from apps.billing.models import Customer, Subscription, SubscriptionHistory, Payment, Webhook
 
 
 CYCLE_DELTA = {
+    "WEEKLY": relativedelta(weeks=1),
     "MONTHLY": relativedelta(months=1),
     "QUARTERLY": relativedelta(months=3),
     "SEMIANNUALLY": relativedelta(months=6),
@@ -28,85 +32,35 @@ CYCLE_DELTA = {
 class SubscriptionPolling(APIView):
 
     def get(self, request):
+        try:
+            data = signing.loads(
+                request.query_params.get("token"),
+                salt="subscription-polling",
+                max_age=3600,
+            )
+        except signing.BadSignature:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         if (
             Subscription.objects
             .filter(
-                customer__customer_id=request.query_params.get("customer_id"),
+                customer__customer_id=data["customer_id"],
                 status="ACTIVE",
             )
             .exists()
         ):
-            return Response(status=status.HTTP_200_OK)
+            return Response({
+                "detail": "Assinatura finalizada",
+                "detail_type": "success",
+            }, status=status.HTTP_200_OK)
+
         return Response(status=status.HTTP_404_NOT_FOUND)
 
 
-class SubscriptionCompanySign(APIView):
+class SubscriptionSign(APIView):
 
     def post(self, request):
-        serializer = SubscriptionCompanySignSerializer(data=request.data)
-        if serializer.is_valid():
-            data = serializer.validated_data
-        else:
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            asaas_customer = AsaasCustomer().create_customer(
-                name=data["full_name"],
-                email=data["email"],
-                cpf_cnpj=data["cnpj"],
-                mobile_phone=data["phone_number"],
-                postal_code=data["postal_code"],
-                address_number=data["address_number"],
-            )
-        except Exception:
-            return Response({
-                "detail": "CPF ou CEP inválido",
-                "detail_type": "error",
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            first_name, separator, last_name = data["full_name"].partition(" ")
-            user = User.objects.create_user(
-                first_name=first_name,
-                last_name=last_name,
-                email=data["email"],
-                password=data["password"],
-                user_type="COMPANY",
-            )
-        except Exception:
-            AsaasCustomer().delete_customer(customer_id=asaas_customer["id"])
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-
-        Customer.objects.create(
-            customer_id=asaas_customer["id"],
-            user=user,
-        )
-
-        Company.objects.create(
-            user=user,
-            cnpj=data["cnpj"],
-            fantasy_name=data["fantasy_name"],
-            company_category=data["company_category"],
-            phone_number=data["phone_number"],
-            postal_code=asaas_customer["postalCode"],
-            state=asaas_customer["state"],
-            city=asaas_customer["cityName"],
-            neighborhood=asaas_customer["province"],
-            street=asaas_customer["address"],
-            address_number=asaas_customer["addressNumber"],
-            complement=asaas_customer["complement"],
-        )
-
-        company_group, _ = Group.objects.get_or_create(name="company")
-        company_group.user_set.add(user)
-
-        return Response(status=status.HTTP_200_OK)
-
-
-class SubscriptionEmployeeSign(APIView):
-
-    def post(self, request):
-        serializer = SubscriptionEmployeeSignSerializer(data=request.data)
+        serializer = SubscriptionSignSerializer(data=request.data)
         if serializer.is_valid():
             data = serializer.validated_data
         else:
@@ -128,79 +82,110 @@ class SubscriptionEmployeeSign(APIView):
             }, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            contract_id = uuid4().hex
             first_name, separator, last_name = data["full_name"].partition(" ")
             user = User.objects.create_user(
                 first_name=first_name,
                 last_name=last_name,
                 email=data["email"],
                 password=data["password"],
-                user_type="EMPLOYEE",
             )
         except Exception:
             AsaasCustomer().delete_customer(customer_id=asaas_customer["id"])
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        try:
-            asaas_subscription = AsaasPayment().create_pix_authorization(
-                customer_id=asaas_customer["id"],
-                value=data["plan"].value,
-                cycle=data["plan"].cycle,
-                next_due_date=timezone.localdate().isoformat(),
-                description=data["plan"].name,
-            )
-        except Exception:
-            user.delete()
-            AsaasCustomer().delete_customer(customer_id=asaas_customer["id"])
-            return Response({
-                "detail": "Dados do PIX inválidos",
-                "detail_type": "error",
-            }, status=status.HTTP_400_BAD_REQUEST)
+        if data["billing_type"] == "PIX":
+            try:
+                asaas_subscription = AsaasSubscription().create_pix_subscription(
+                    contract_id=contract_id,
+                    customer_id=asaas_customer["id"],
+                    first_value=data["plan"].value,
+                    recurring_value=data["plan"].value,
+                    cycle=data["plan"].cycle,
+                    due_date=timezone.localdate().isoformat(),
+                    description=data["plan"].name,
+                )
+            except Exception:
+                user.delete()
+                AsaasCustomer().delete_customer(customer_id=asaas_customer["id"])
+                return Response({
+                    "detail": "Dados de pagamento inválidos",
+                    "detail_type": "error",
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        elif data["billing_type"] == "CREDIT_CARD":
+            try:
+                asaas_payment = AsaasSubscription().create_credit_card_subscription(
+                    customer_id=asaas_customer["id"],
+                    billing_type=data["billing_type"],
+                    value=data["plan"].value,
+                    due_date=timezone.localdate().isoformat(),
+                    description=data["plan"].name,
+                    credit_card={
+                        "holderName": data["holder_name"],
+                        "number": data["number"],
+                        "expiryMonth": data["expiry_date"][0],
+                        "expiryYear": data["expiry_date"][1],
+                        "ccv": data["ccv"],
+                    },
+                    credit_card_holder_info={
+                        "name": data["full_name"],
+                        "email": data["email"],
+                        "mobilePhone": data["phone_number"],
+                        "cpfCnpj": data["cpf"],
+                        "postalCode": data["postal_code"],
+                        "addressNumber": data["address_number"],
+                    },
+                )
+            except Exception:
+                user.delete()
+                AsaasCustomer().delete_customer(customer_id=asaas_customer["id"])
+                return Response({
+                    "detail": "Dados de pagamento inválidos",
+                    "detail_type": "error",
+                }, status=status.HTTP_400_BAD_REQUEST)
 
         customer = Customer.objects.create(
             customer_id=asaas_customer["id"],
             user=user,
         )
 
-        Subscription.objects.create(
-            subscription_id=asaas_subscription["contractId"],
-            authorization_id=asaas_subscription["id"],
+        subscription = Subscription.objects.create(
+            subscription_id=contract_id,
+            pix_conciliation_identifier=asaas_payment["immediateQrCode"]["conciliationIdentifier"] if data["billing_type"] == "PIX" else None,
+            pix_authorization_id=asaas_payment["id"] if data["billing_type"] == "PIX" else None,
+            credit_card_token=asaas_payment["creditCard"]["creditCardToken"] if data["billing_type"] == "CREDIT_CARD" else None,
             customer=customer,
             plan=data["plan"],
-            billing_type="PIX",
-            status="INACTIVE",
-            next_due=timezone.now().date(),
+            billing_type=data["billing_type"],
+            status="ACTIVE" if data["billing_type"] == "CREDIT_CARD" else "INACTIVE",
         )
 
-        Employee.objects.create(
-            user=user,
-            cpf=data["cpf"],
-            phone_number=data["phone_number"],
-            birth_date=data["birth_date"],
-            gender=data["gender"],
-            marital_status=data["marital_status"],
-            postal_code=asaas_customer["postalCode"],
-            state=asaas_customer["state"],
-            city=asaas_customer["cityName"],
-            neighborhood=asaas_customer["province"],
-            street=asaas_customer["address"],
-            address_number=asaas_customer["addressNumber"],
-        )
+        if data["billing_type"] == "PIX":
+            token = signing.dumps(
+                {
+                    "customer_id": customer.customer_id,
+                },
+                salt="subscription-polling",
+            )
 
-        employee_group, _ = Group.objects.get_or_create(name="employee")
-        employee_group.user_set.add(user)
+            return Response({
+                "token": token,
+                "payload": asaas_subscription["payload"],
+                "encoded_image": asaas_subscription["encodedImage"],
+            }, status=status.HTTP_200_OK)
 
-        return Response({
-            "customer_id": asaas_customer["id"],
-            "payload": asaas_subscription["payload"],
-            "encoded_image": asaas_subscription["encodedImage"],
-        }, status=status.HTTP_200_OK)
+        elif data["billing_type"] == "CREDIT_CARD":
+            SubscriptionHistory.objects.create(
+                subscription=subscription,
+                plan=subscription.plan,
+                status="ACTIVE",
+            )
 
-
-class SubscriptionRenew(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        pass
+            return Response({
+                "detail": "Assinatura finalizada",
+                "detail_type": "success",
+            }, status=status.HTTP_200_OK)
 
 
 class SubscriptionCancel(APIView):
@@ -219,25 +204,10 @@ class SubscriptionCancel(APIView):
                 "detail_type": "error",
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        AsaasPayment().delete_pix_authorization(
-            authorization_id=subscription.authorization_id,
-        )
-
-        SubscriptionPlanHistory.objects.filter(
-            subscription=subscription,
-            status="PENDING",
-        ).delete()
-
-        if pending_payments := Payment.objects.filter(subscription=subscription, status="PENDING"):
-            for payment in pending_payments:
-                AsaasPayment().delete_payment(payment_id=payment.payment_id)
-
-        first_payment = Payment.objects.filter(subscription=subscription).first()
-        if first_payment.paid_at >= timezone.localdate() - timedelta(days=subscription.plan.refund_period):
-            AsaasPayment().refund_payment(payment_id=first_payment.payment_id)
+        deactivate_subscription(subscription)
 
         return Response({
-            "detail": "Assinatura cancelada, você não receberá mais cobranças",
+            "detail": "Assinatura cancelada",
             "detail_type": "success",
         }, status=status.HTTP_200_OK)
 
@@ -254,18 +224,32 @@ class AsaasWebhook(APIView):
             event = payload.get("event")
 
             with transaction.atomic():
-                subscription = Subscription.objects.get(
-                    customer__customer_id=(
-                        payload.get("payment", {}).get("customer") or
-                        payload.get("authorization", {}).get("customerId") or
-                        payload.get("paymentInstruction", {}).get("authorization", {}).get("customerId")
-                    )
+                customer_id = (
+                    payload.get("payment", {}).get("customer") or
+                    payload.get("authorization", {}).get("customerId") or
+                    payload.get("paymentInstruction", {}).get("authorization", {}).get("customerId")
+                )
+                conciliation_id = (
+                    payload.get("payment", {}).get("pixQrCodeId") or
+                    payload.get("paymentInstruction", {}).get("conciliationIdentifier")
                 )
 
+                filters = Q()
+                if customer_id:
+                    filters |= Q(customer__customer_id=customer_id)
+                if conciliation_id:
+                    filters |= Q(pix_conciliation_identifier=conciliation_id)
+
+                subscription = Subscription.objects.filter(filters).first() if filters else None
+                if not subscription:
+                    customer = Customer.objects.filter(customer_id=customer_id).first()
+
                 webhook, created = Webhook.objects.get_or_create(
-                    event_id=payload.get("id"),
+                    webhook_id=payload.get("id"),
                     defaults={
                         "subscription": subscription,
+                        "customer": subscription.customer if subscription else customer,
+                        "event": event,
                         "payload": payload,
                     },
                 )
@@ -273,26 +257,13 @@ class AsaasWebhook(APIView):
                     return Response(status=status.HTTP_200_OK)
 
                 if event in [
-                    "PIX_AUTOMATIC_RECURRING_AUTHORIZATION_ACTIVATED", "PIX_AUTOMATIC_RECURRING_AUTHORIZATION_CANCELLED",
-                    "PIX_AUTOMATIC_RECURRING_AUTHORIZATION_EXPIRED",
+                    "PIX_AUTOMATIC_RECURRING_AUTHORIZATION_ACTIVATED", "PIX_AUTOMATIC_RECURRING_AUTHORIZATION_CANCELLED", "PIX_AUTOMATIC_RECURRING_AUTHORIZATION_EXPIRED",
+                    "PIX_AUTOMATIC_RECURRING_PAYMENT_INSTRUCTION_REFUSED",
                 ]:
                     if event == "PIX_AUTOMATIC_RECURRING_AUTHORIZATION_ACTIVATED":
-                        new_status = "ACTIVE"
+                        activate_subscription(subscription)
                     else:
-                        new_status = "INACTIVE"
-                        subscription.next_due = None
-
-                        if pending_payments := Payment.objects.filter(subscription=subscription, status="PENDING"):
-                            for payment in pending_payments:
-                                AsaasPayment().delete_payment(payment_id=payment.payment_id)
-
-                    subscription.status = new_status
-                    subscription.save()
-
-                    SubscriptionStatusHistory.objects.create(
-                        subscription=subscription,
-                        status=new_status,
-                    )
+                        deactivate_subscription(subscription)
 
                 elif event in [
                     "PAYMENT_CREATED", "PAYMENT_CONFIRMED", "PAYMENT_RECEIVED",
@@ -304,29 +275,24 @@ class AsaasWebhook(APIView):
                         payment_id=data.get("id"),
                         defaults={
                             "subscription": subscription,
+                            "customer": subscription.customer if subscription else customer,
                             "value": data.get("value"),
+                            "billing_type": data.get("billingType"),
                             "status": data.get("status"),
                             "paid_at": data.get("clientPaymentDate"),
                             "due_date": data.get("dueDate"),
                         },
                     )
 
-                    if event == "PAYMENT_CONFIRMED":
-                        subscription.next_due = subscription.next_due + CYCLE_DELTA[subscription.plan.cycle]
+                    if subscription and (
+                        event == "PAYMENT_CONFIRMED" and data.get("billingType") == "CREDIT_CARD" or
+                        event == "PAYMENT_RECEIVED" and data.get("billingType") == "PIX"
+                    ):
+                        subscription.next_due = datetime.strptime(data.get("dueDate"), "%Y-%m-%d").date() + CYCLE_DELTA[subscription.plan.cycle]
                         subscription.save()
-
-                    elif event == "PAYMENT_OVERDUE":
-                        subscription.status = "INACTIVE"
-                        subscription.next_due = None
-                        subscription.save()
-
-                        if pending_payments := Payment.objects.filter(subscription=subscription, status="PENDING"):
-                            for payment in pending_payments:
-                                AsaasPayment().delete_payment(payment_id=payment.payment_id)
 
                 elif event == "PAYMENT_DELETED":
-                    if payment := Payment.objects.filter(payment_id=payload.get("payment").get("id")).first():
-                        payment.delete()
+                    Payment.objects.filter(payment_id=payload.get("payment").get("id")).delete()
         except Exception as error:
             return Response({"error": str(error)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

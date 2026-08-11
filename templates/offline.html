@@ -1,24 +1,83 @@
-{% extends "layouts/centralized.html" %}
-
-
-{% block "body" %}
-<div>
-    <p class="font-medium text-blue-400 text-sm">Erro 503</p>
-    <p class="mt-2 font-semibold text-white text-2xl md:text-3xl">Não conseguimos acessar o serviço no momento</p>
-    <p class="mt-4 text-gray-300">Falha na conexão com a internet ou instabilidade do servidor</p>
-    <c-html.a class="mt-8 px-6 w-fit text-xs" href="{% url 'login' %}">Tentar novamente</c-html.a>
-</div>
-{% endblock %}
-
-
-{% block "script" %}
-<script>
-document.addEventListener("alpine:init", () => {
-    Alpine.data("alpine", () => ({
-
-        
-
-    }))
-})
-</script>
-{% endblock %}
+<!doctype html>
+<html lang="pt-BR">
+    <head>
+        <title>Dindinja</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="description" content="Plataforma de parceria entre empresários e trabalhadores">
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                font-family: system-ui, sans-serif;
+            }
+            body {
+                background-color: #f3f4f6;
+            }
+            .container {
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                margin-left: auto;
+                margin-right: auto;
+                max-width: 80rem;
+                min-height: 100svh;
+            }
+            .error-code {
+                color: #4f39f6;
+                font-weight: 500;
+                font-size: 0.875rem;
+                line-height: 1.25rem;
+            }
+            .error-title {
+                margin-top: 0.5rem;
+                font-weight: 600;
+                font-size: 1.5rem;
+                line-height: 2rem;
+            }
+            .error-message {
+                margin-top: 1rem;
+                color: #4b5563;
+            }
+            .retry-button {
+                display: block;
+                width: fit-content;
+                margin-top: 2rem;
+                padding: 0.5rem 1rem;
+                color: #ffffff;
+                font-weight: 600;
+                font-size: 0.875rem;
+                cursor: pointer;
+                text-decoration: none;
+                border-radius: 0.5rem;
+                background-color: #4f39f6;
+                transition: background-color 0.3s;
+            }
+            .retry-button:hover {
+                background-color: #615fff;
+            }
+            @media (max-width: 1280px) {
+                .container {
+                    padding-left: 1rem;
+                    padding-right: 1rem;
+                }
+            }
+            @media (min-width: 768px) {
+                .error-title {
+                    font-size: 1.875rem;
+                    line-height: 2.25rem;
+                }
+            }
+        </style>
+    </head>
+    <body class="container">
+        <div>
+            <p class="error-code">Erro 503</p>
+            <p class="error-title">Não conseguimos acessar o serviço no momento</p>
+            <p class="error-message">Falha na conexão com a internet ou instabilidade do servidor</p>
+            <a class="retry-button" href="/entrar">Tentar novamente</a>
+        </div>
+    </body>
+</html>

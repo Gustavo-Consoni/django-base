@@ -5,6 +5,7 @@ from apps.account.models import User
 class Plan(models.Model):
 
     class Cycle(models.TextChoices):
+        WEEKLY       = "WEEKLY",       "Semanal"
         MONTHLY      = "MONTHLY",      "Mensal"
         QUARTERLY    = "QUARTERLY",    "Trimestral"
         SEMIANNUALLY = "SEMIANNUALLY", "Semestral"
@@ -24,30 +25,6 @@ class Plan(models.Model):
     class Meta:
         verbose_name = "plano"
         verbose_name_plural = "planos"
-
-
-class Coupon(models.Model):
-
-    class DiscountType(models.TextChoices):
-        PERCENTAGE = "PERCENTAGE", "Porcentagem"
-        FIXED      = "FIXED",      "Fixo"
-
-    code              = models.CharField(max_length=20, unique=True, verbose_name="Código do Cupom")
-    discount          = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Desconto")
-    discount_type     = models.CharField(max_length=20, choices=DiscountType.choices, verbose_name="Tipo de desconto")
-    maximum_uses      = models.PositiveIntegerField(null=True, blank=True, verbose_name="Máximo de Usos")
-    total_uses        = models.PositiveIntegerField(default=0, verbose_name="Total de Usos")
-    active            = models.BooleanField(default=False, verbose_name="Ativo")
-    activation_date   = models.DateField(null=True, blank=True, verbose_name="Data de ativação")
-    deactivation_date = models.DateField(null=True, blank=True, verbose_name="Data de desativação")
-    created_at        = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
-
-    def __str__(self):
-        return self.code
-
-    class Meta:
-        verbose_name = "cupom"
-        verbose_name_plural = "cupons"
 
 
 class Customer(models.Model):
@@ -73,30 +50,34 @@ class Subscription(models.Model):
         ACTIVE   = "ACTIVE",   "Ativa"
         INACTIVE = "INACTIVE", "Inativa"
 
-    subscription_id   = models.CharField(max_length=50, unique=True, verbose_name="Código da Assinatura")
-    authorization_id  = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name="Código de Autorização do Pix Automático")
-    credit_card_token = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name="Código de Autorização do Cartão de Crédito")
-    customer          = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="subscriptions", verbose_name="Código do Cliente")
-    plan              = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="subscriptions", verbose_name="Plano")
-    coupon            = models.ForeignKey(Coupon, null=True, blank=True, on_delete=models.SET_NULL, related_name="subscriptions", verbose_name="Cupom")
-    billing_type      = models.CharField(max_length=20, choices=BillingType.choices, verbose_name="Tipo de Cobrança")
-    status            = models.CharField(max_length=20, choices=Status.choices, default=Status.INACTIVE, verbose_name="Status da Assinatura")
-    next_due          = models.DateField(null=True, blank=True, verbose_name="Próximo Vencimento")
-    created_at        = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
+    subscription_id             = models.CharField(max_length=50, unique=True, verbose_name="Código da Assinatura")
+    pix_authorization_id        = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name="Código de Autorização do Pix Automático")
+    pix_conciliation_identifier = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name="Identificador de Conciliação do Pix Automático")
+    credit_card_token           = models.CharField(max_length=50, unique=True, null=True, blank=True, verbose_name="Código de Autorização do Cartão de Crédito")
+    customer                    = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="subscriptions", verbose_name="Código do Cliente")
+    plan                        = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="subscriptions", verbose_name="Plano")
+    billing_type                = models.CharField(max_length=20, choices=BillingType.choices, verbose_name="Tipo de Cobrança")
+    status                      = models.CharField(max_length=20, choices=Status.choices, default=Status.INACTIVE, verbose_name="Status")
+    next_due                    = models.DateField(null=True, blank=True, verbose_name="Próximo Vencimento")
+    created_at                  = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
 
     def __str__(self):
         return self.subscription_id
 
     def clean(self):
         super().clean()
-        if self.authorization_id == "":
-            self.authorization_id = None
+        if self.pix_conciliation_identifier == "":
+            self.pix_conciliation_identifier = None
+        if self.pix_authorization_id == "":
+            self.pix_authorization_id = None
         if self.credit_card_token == "":
             self.credit_card_token = None
 
     def save(self, *args, **kwargs):
-        if self.authorization_id == "":
-            self.authorization_id = None
+        if self.pix_conciliation_identifier == "":
+            self.pix_conciliation_identifier = None
+        if self.pix_authorization_id == "":
+            self.pix_authorization_id = None
         if self.credit_card_token == "":
             self.credit_card_token = None
         super().save(*args, **kwargs)
@@ -106,42 +87,23 @@ class Subscription(models.Model):
         verbose_name_plural = "assinaturas"
 
 
-class SubscriptionStatusHistory(models.Model):
+class SubscriptionHistory(models.Model):
 
     class Status(models.TextChoices):
         ACTIVE   = "ACTIVE",   "Ativa"
         INACTIVE = "INACTIVE", "Inativa"
 
-    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name="subscription_status_histories", verbose_name="Código da Assinatura")
-    status       = models.CharField(max_length=20, choices=Status.choices, verbose_name="Status da Assinatura")
+    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name="subscription_histories", verbose_name="Código da Assinatura")
+    plan         = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name="subscription_histories", verbose_name="Plano")
+    status       = models.CharField(max_length=20, choices=Status.choices, verbose_name="Status")
     created_at   = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
 
     def __str__(self):
-        return f"{self.subscription} - {self.status}"
+        return self.subscription.subscription_id
 
     class Meta:
         verbose_name = "histórico de assinatura"
         verbose_name_plural = "histórico de assinaturas"
-
-
-class SubscriptionPlanHistory(models.Model):
-
-    class Status(models.TextChoices):
-        CONFIRMED = "CONFIRMED", "Confirmado"
-        PENDING   = "PENDING",   "Pendente"
-
-    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name="subscription_plan_histories", verbose_name="Código da Assinatura")
-    old_plan     = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name="subscription_old_plan_histories", verbose_name="Plano Antigo")
-    new_plan     = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name="subscription_new_plan_histories", verbose_name="Plano Novo")
-    status       = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, verbose_name="Status da Alteração")
-    created_at   = models.DateTimeField(auto_now_add=True, verbose_name="Data de Criação")
-
-    def __str__(self):
-        return f"{self.subscription} - {self.old_plan} - {self.new_plan}"
-
-    class Meta:
-        verbose_name = "histórico de plano"
-        verbose_name_plural = "histórico de planos"
 
 
 class Payment(models.Model):
@@ -151,16 +113,17 @@ class Payment(models.Model):
         CREDIT_CARD = "CREDIT_CARD", "Cartão de Crédito"
 
     class Status(models.TextChoices):
-        RECEIVED  = "RECEIVED",  "Recebido"
-        CONFIRMED = "CONFIRMED", "Confirmado"
         PENDING   = "PENDING",   "Pendente"
+        CONFIRMED = "CONFIRMED", "Confirmado"
+        RECEIVED  = "RECEIVED",  "Recebido"
         OVERDUE   = "OVERDUE",   "Vencido"
         REFUNDED  = "REFUNDED",  "Reembolsado"
 
     payment_id   = models.CharField(max_length=50, unique=True, verbose_name="Código da Cobrança")
-    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name="payments", verbose_name="Código da Assinatura")
-    value        = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor")
+    subscription = models.ForeignKey(Subscription, null=True, blank=True, on_delete=models.CASCADE, related_name="payments", verbose_name="Código da Assinatura")
+    customer     = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name="payments", verbose_name="Código do Cliente")
     billing_type = models.CharField(max_length=20, choices=BillingType.choices, verbose_name="Tipo de Cobrança")
+    value        = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="Valor")
     status       = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, verbose_name="Status da Cobrança")
     paid_at      = models.DateField(null=True, blank=True, verbose_name="Data de Pagamento")
     due_date     = models.DateField(verbose_name="Data de Vencimento")
@@ -175,13 +138,15 @@ class Payment(models.Model):
 
 
 class Webhook(models.Model):
-    event_id     = models.CharField(max_length=50, unique=True, verbose_name="Código do Evento")
-    subscription = models.ForeignKey(Subscription, on_delete=models.CASCADE, related_name="webhooks", verbose_name="Código da Assinatura")
+    webhook_id   = models.CharField(max_length=50, unique=True, verbose_name="Código do Webhook")
+    subscription = models.ForeignKey(Subscription, null=True, blank=True, on_delete=models.CASCADE, related_name="webhooks", verbose_name="Código da Assinatura")
+    customer     = models.ForeignKey(Customer, null=True, blank=True, on_delete=models.CASCADE, related_name="webhooks", verbose_name="Código do Cliente")
+    event        = models.CharField(max_length=50, db_index=True, verbose_name="Evento")
     payload      = models.JSONField(verbose_name="Payload")
     created_at   = models.DateTimeField(auto_now_add=True, verbose_name="Data de criação")
 
     def __str__(self):
-        return self.event_id
+        return self.webhook_id
 
     class Meta:
         verbose_name = "webhook"

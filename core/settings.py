@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "apps.home",
     "apps.account",
     "apps.billing",
+    "apps.notification",
 ]
 
 MIDDLEWARE = [
@@ -66,6 +67,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.pwa",
             ],
         },
     },
@@ -213,3 +215,12 @@ ASAAS_API_KEY = config("ASAAS_API_KEY")
 ASAAS_ACCESS_TOKEN = config("ASAAS_ACCESS_TOKEN")
 
 ASAAS_BASE_URL = config("ASAAS_BASE_URL")
+
+
+# Webpush
+
+VAPID_PUBLIC_KEY = config("VAPID_PUBLIC_KEY")
+
+VAPID_PRIVATE_KEY = config("VAPID_PRIVATE_KEY")
+
+VAPID_EMAIL = config("VAPID_EMAIL")
